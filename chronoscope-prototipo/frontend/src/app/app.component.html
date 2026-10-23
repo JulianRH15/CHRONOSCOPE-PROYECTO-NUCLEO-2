@@ -1,0 +1,36 @@
+<header class="barra">
+  <div class="marca">
+    <span class="logo" aria-hidden="true">
+      <i class="c1"></i><i></i><i class="c2"></i><i></i><i class="c3"></i><i></i><i class="c4"></i><i></i><i class="c1"></i>
+    </span>
+    <span class="nombre">ChronoScope</span>
+    <span class="periodo">Ingeniería de Sistemas · 2026-2</span>
+  </div>
+
+  <nav class="menu">
+    <a routerLink="/horario" routerLinkActive="activo">Horario</a>
+    <a routerLink="/cierre" routerLinkActive="activo">Cierre de grupos</a>
+    <a routerLink="/versiones" routerLinkActive="activo">Versiones</a>
+    <a routerLink="/notificaciones" routerLinkActive="activo">Notificaciones</a>
+  </nav>
+
+  <div class="acciones">
+    <label class="rol">
+      <span>Rol</span>
+      <select [value]="sesion.rol()" (change)="cambiarRol($any($event.target).value)">
+        <option value="COMITE">Comité de Área</option>
+        <option value="DIRECTOR">Director de Programa</option>
+      </select>
+    </label>
+    <a class="enlace" href="/swagger-ui.html" target="_blank" rel="noopener">API</a>
+    <button class="enlace" type="button" (click)="reiniciar()" title="Vuelve los datos al estado inicial">Reiniciar demo</button>
+  </div>
+</header>
+
+<main>
+  <router-outlet />
+</main>
+
+@if (sesion.aviso(); as aviso) {
+  <div class="aviso" [class]="'aviso ' + aviso.tipo" role="status">{{ aviso.texto }}</div>
+}

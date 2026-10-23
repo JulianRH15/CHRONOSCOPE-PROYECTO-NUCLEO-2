@@ -1,0 +1,44 @@
+.barra {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 28px;
+  padding: 0 24px; height: 60px;
+  background: var(--navy); color: #fff;
+}
+.marca { display: flex; align-items: center; gap: 10px; }
+.logo { display: grid; grid-template-columns: repeat(3, 7px); gap: 2px; }
+.logo i { width: 7px; height: 7px; border-radius: 2px; background: #3a4266; }
+.logo .c1 { background: var(--lima); } .logo .c2 { background: var(--violeta); }
+.logo .c3 { background: var(--verde); } .logo .c4 { background: var(--ambar); }
+.nombre { font-weight: 700; font-size: 18px; letter-spacing: -0.01em; }
+.periodo { font-size: 12px; color: #9aa3c7; padding-left: 10px; border-left: 1px solid #3a4266; }
+
+.menu { display: flex; gap: 4px; height: 100%; }
+.menu a {
+  display: flex; align-items: center; padding: 0 14px; color: #c9cfea; text-decoration: none;
+  font-size: 14px; font-weight: 500; border-bottom: 3px solid transparent;
+}
+.menu a:hover { color: #fff; }
+.menu a.activo { color: #fff; border-bottom-color: var(--lima); }
+
+.acciones { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+.rol { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #9aa3c7; }
+.rol select {
+  background: #2a3150; color: #fff; border: 1px solid #3a4266; border-radius: 8px;
+  padding: 6px 10px; font: inherit; font-size: 13px;
+}
+.enlace {
+  background: none; border: 0; color: #c9cfea; font: inherit; font-size: 13px; cursor: pointer;
+  text-decoration: none; padding: 4px 2px;
+}
+.enlace:hover { color: #fff; text-decoration: underline; }
+
+main { padding: 20px 24px 40px; }
+
+.aviso {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50;
+  padding: 12px 18px; border-radius: 10px; font-size: 14px; max-width: 640px;
+  box-shadow: 0 10px 30px rgba(22, 26, 48, .25); background: var(--navy); color: #fff;
+}
+.aviso.ok { border-left: 4px solid var(--verde); }
+.aviso.error { border-left: 4px solid var(--rojo); }
+.aviso.info { border-left: 4px solid var(--violeta); }

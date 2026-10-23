@@ -1,0 +1,208 @@
+<section class="encabezado">
+  <div>
+    <div class="sobretitulo">Épica 2 · Cierre de grupos por baja matrícula</div>
+    <h1>Cierre de grupos</h1>
+    <p>Al corte de matrícula se cierran los grupos con pocos inscritos y solo se re-optimiza lo que se ve afectado.</p>
+  </div>
+</section>
+
+<ol class="pasos">
+  <li [class.hecho]="paso() > 1" [class.actual]="paso() === 1"><span>1</span> Cargar inscritos</li>
+  <li [class.hecho]="paso() > 2" [class.actual]="paso() === 2"><span>2</span> Revisar y cerrar</li>
+  <li [class.hecho]="paso() > 3" [class.actual]="paso() === 3"><span>3</span> Validar impacto</li>
+  <li [class.hecho]="paso() === 4" [class.actual]="paso() === 4"><span>4</span> Publicar y notificar</li>
+</ol>
+
+@if (horario() && !publicado() && !resultado()) {
+  <div class="aviso-bloque">
+    <div>
+      <strong>Primero hay que publicar el horario.</strong>
+      El cierre de grupos trabaja sobre la versión publicada (estado actual: {{ horario()?.estado?.toLowerCase() }}, versión {{ horario()?.version }}).
+    </div>
+    <a class="btn oscuro" routerLink="/horario">Ir al horario</a>
+  </div>
+}
+
+<!-- ======================= Paso 4: publicado ======================= -->
+@if (enviadas().length) {
+  <section class="tarjeta exito">
+    <div class="sobretitulo">Ajuste publicado · versión {{ horario()?.version }}</div>
+    <h2>Se enviaron {{ enviadas().length }} notificaciones</h2>
+    <ul class="correos">
+      @for (n of enviadas(); track n.id) {
+        <li><strong>{{ n.para }}</strong><span>{{ n.asunto }}</span></li>
+      }
+    </ul>
+    <div class="botones">
+      <a class="btn" routerLink="/notificaciones">Ver bandeja de notificaciones</a>
+      <a class="btn" routerLink="/horario">Ver horario publicado</a>
+      <button class="btn primario" type="button" (click)="otroCierre()">Cerrar otro grupo</button>
+    </div>
+  </section>
+}
+
+<!-- ======================= Paso 3: resultado ======================= -->
+@if (resultado(); as r) {
+  <section class="tarjeta resultado">
+    <header>
+      <div>
+        <div class="sobretitulo">Impacto del cierre · borrador versión {{ r.nuevaVersion }}</div>
+        <h2>{{ r.grupoCerrado }} cerrado
+          @if (r.grupoReceptor) { <span class="flecha">→ {{ r.estudiantesReasignados }} estudiantes pasan a {{ r.grupoReceptor }} ({{ r.inscritosReceptor }} en total)</span> }
+        </h2>
+      </div>
+    </header>
+
+    <div class="kpis">
+      <div class="kpi"><b>{{ r.sesionesLiberadas.length }}</b><span>sesiones liberadas</span></div>
+      <div class="kpi violeta"><b>{{ r.sesionesReoptimizadas.length }}</b><span>sesiones re-optimizadas</span></div>
+      <div class="kpi verde"><b>{{ r.sesionesIntactas }}</b><span>sesiones sin cambios</span></div>
+    </div>
+
+    <h3>Sesiones re-optimizadas</h3>
+    @if (r.sesionesReoptimizadas.length === 0) {
+      <p class="suave">Ninguna. El grupo receptor cabe en sus aulas actuales; el resto del horario queda igual.</p>
+    } @else {
+      <table class="tabla">
+        <thead><tr><th>Grupo</th><th>Antes</th><th></th><th>Después</th><th>Motivo</th></tr></thead>
+        <tbody>
+          @for (c of r.sesionesReoptimizadas; track c.sesionId) {
+            <tr>
+              <td><strong>{{ c.grupo }}</strong></td>
+              <td class="antes">{{ c.antes }}</td>
+              <td>→</td>
+              <td class="despues">{{ c.despues }}</td>
+              <td class="suave">{{ c.motivo }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+
+    <h3>Franjas liberadas</h3>
+    <div class="chips">
+      @for (l of r.sesionesLiberadas; track l) { <span class="chip">{{ l }}</span> }
+    </div>
+
+    <h3>Se notificará a</h3>
+    <ul class="pendientes">
+      @for (n of r.notificacionesPendientes; track n) { <li>{{ n }}</li> }
+    </ul>
+
+    <div class="botones">
+      <a class="btn" routerLink="/horario">Ver cambios en el horario</a>
+      <button class="btn primario" type="button" (click)="publicar()" [disabled]="ocupado() || !sesion.esDirector()">
+        ✓ Validar y publicar ajuste
+      </button>
+    </div>
+  </section>
+}
+
+<!-- ======================= Paso 1: cargar ======================= -->
+<section class="tarjeta carga" [class.compacta]="analisis()?.inscritosCargados">
+  <div class="carga-texto">
+    <h3>Inscritos por grupo (archivo de Matrícula)</h3>
+    @if (analisis()?.inscritosCargados) {
+      <p>Cargado: <strong>{{ analisis()?.archivo }}</strong>. Puedes volver a cargar otro archivo.</p>
+    } @else {
+      <p>Archivo CSV con dos columnas: <code>codigo_grupo,inscritos</code>. Si una fila tiene error no se carga nada.</p>
+    }
+    @if (errorArchivo()) { <p class="error">{{ errorArchivo() }}</p> }
+  </div>
+  <div class="botones">
+    <a class="btn" href="/api/cierre/inscritos/ejemplo.csv" download>Descargar plantilla</a>
+    <label class="btn">
+      Subir archivo…
+      <input type="file" accept=".csv,text/csv" (change)="subirArchivo($event)" hidden>
+    </label>
+    <button class="btn primario" type="button" (click)="usarEjemplo()">Usar archivo de Matrícula 2026-2</button>
+  </div>
+</section>
+
+<!-- ======================= Paso 2: analisis ======================= -->
+@if (analisis()?.inscritosCargados) {
+  <section class="tarjeta analisis">
+    <header>
+      <div>
+        <h3>Grupos del periodo</h3>
+        <p class="suave">Mínimo {{ analisis()?.minimo }} estudiantes · cupo {{ analisis()?.cupoMaximo }} + 10 % = {{ analisis()?.cupoConTolerancia }}</p>
+      </div>
+      <div class="kpis pequenos">
+        <div class="kpi"><b>{{ totales().total }}</b><span>abiertos</span></div>
+        <div class="kpi rojo"><b>{{ totales().bajo }}</b><span>bajo el mínimo</span></div>
+        <div class="kpi ambar"><b>{{ totales().sobre }}</b><span>sobre el cupo</span></div>
+        <div class="kpi"><b>{{ totales().cerrados }}</b><span>cerrados</span></div>
+      </div>
+    </header>
+    <label class="interruptor">
+      <input type="checkbox" [checked]="soloAlertas()" (change)="soloAlertas.set($any($event.target).checked)">
+      Mostrar solo grupos con alerta
+    </label>
+    <table class="tabla">
+      <thead>
+        <tr><th>Grupo</th><th>Curso</th><th>Docente</th><th>Inscritos</th><th>Estado</th><th>Si se cierra</th><th></th></tr>
+      </thead>
+      <tbody>
+        @for (g of grupos(); track g.grupoId) {
+          <tr [class.cerrado]="g.estadoMatricula === 'CERRADO'">
+            <td><strong>{{ g.codigo }}</strong></td>
+            <td>{{ g.curso }} <span class="suave">· sem {{ g.semestre }}</span></td>
+            <td>{{ g.docente }}</td>
+            <td>
+              <div class="barra-cupo">
+                <span>{{ g.inscritos }}</span>
+                <i><b [style.width.%]="porcentaje(g)" [class.bajo]="g.estadoMatricula === 'BAJO_MINIMO'"></b></i>
+              </div>
+            </td>
+            <td>
+              <span class="etiqueta"
+                    [class.alerta]="g.estadoMatricula === 'BAJO_MINIMO'"
+                    [class.borrador]="g.estadoMatricula === 'SOBRE_CUPO'"
+                    [class.ok]="g.estadoMatricula === 'OK'"
+                    [class.archivado]="g.estadoMatricula === 'CERRADO'">{{ textoEstado(g.estadoMatricula) }}</span>
+            </td>
+            <td class="suave">
+              @if (g.estadoMatricula !== 'CERRADO') {
+                @if (g.grupoReceptor) { pasan a {{ g.grupoReceptor }} ({{ totalReceptor(g) }}) } @else { sin grupo receptor }
+              }
+            </td>
+            <td class="accion">
+              @if (g.estadoMatricula !== 'CERRADO') {
+                <button class="btn" type="button"
+                        [class.peligro]="g.estadoMatricula === 'BAJO_MINIMO'"
+                        [disabled]="!publicado() || !!resultado()"
+                        (click)="pedirCierre(g)">Cerrar grupo</button>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="7" class="suave">No hay grupos con alerta.</td></tr>
+        }
+      </tbody>
+    </table>
+  </section>
+}
+
+<!-- ======================= Confirmacion ======================= -->
+@if (porCerrar(); as g) {
+  <div class="velo" (click)="porCerrar.set(null)">
+    <div class="modal tarjeta" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+      <div class="sobretitulo">Confirmar cierre</div>
+      <h2>¿Cerrar {{ g.codigo }}?</h2>
+      <ul>
+        <li>{{ g.curso }} · {{ g.docente }}</li>
+        <li><strong>{{ g.inscritos }}</strong> inscritos (mínimo {{ g.minimo }}).</li>
+        @if (g.grupoReceptor) {
+          <li>Los estudiantes pasan a <strong>{{ g.grupoReceptor }}</strong>, que queda con {{ totalReceptor(g) }} de {{ g.cupoConTolerancia }} permitidos.</li>
+          <li>Solo se re-optimizan las sesiones de {{ g.grupoReceptor }} si su aula ya no alcanza. El resto del horario no cambia.</li>
+        } @else {
+          <li>El curso no tiene otro grupo: los estudiantes deberán inscribirse en otra asignatura.</li>
+        }
+      </ul>
+      <div class="botones">
+        <button class="btn" type="button" (click)="porCerrar.set(null)">Cancelar</button>
+        <button class="btn peligro" type="button" (click)="confirmarCierre()" [disabled]="ocupado()">Cerrar grupo y re-optimizar</button>
+      </div>
+    </div>
+  </div>
+}

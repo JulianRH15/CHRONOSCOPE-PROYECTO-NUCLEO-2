@@ -1,0 +1,163 @@
+@if (horario(); as h) {
+  <section class="encabezado">
+    <div>
+      <div class="sobretitulo">Épica 1 · Ajuste y publicación del horario</div>
+      <h1>Horario 2026-2
+        <span class="etiqueta" [class.borrador]="h.estado === 'BORRADOR'" [class.publicado]="h.estado === 'PUBLICADO'">
+          {{ h.estado === 'BORRADOR' ? 'Borrador' : 'Publicado' }} · versión {{ h.version }}
+        </span>
+      </h1>
+      <p>Arrastra una sesión a otra franja. El sistema revisa las reglas al instante y marca los conflictos.</p>
+    </div>
+  </section>
+
+  <section class="tarjeta herramientas">
+    <div class="segmentado" role="tablist" aria-label="Ver horario por">
+      <button type="button" [class.activo]="vistaPor() === 'SEMESTRE'" (click)="cambiarVista('SEMESTRE')">Semestre</button>
+      <button type="button" [class.activo]="vistaPor() === 'DOCENTE'" (click)="cambiarVista('DOCENTE')">Docente</button>
+      <button type="button" [class.activo]="vistaPor() === 'AULA'" (click)="cambiarVista('AULA')">Aula</button>
+    </div>
+    <select class="filtro" [value]="filtro()" (change)="cambiarFiltro($any($event.target).value)" aria-label="Filtro">
+      @for (o of opcionesFiltro(); track o.id) {
+        <option [value]="o.id" [selected]="o.id === filtro()">{{ o.nombre }}</option>
+      }
+    </select>
+
+    <div class="separador"></div>
+
+    <button class="btn" type="button" (click)="deshacer()" [disabled]="!h.puedeDeshacer || ocupado()" title="Deshacer el último cambio">↶ Deshacer</button>
+    <button class="btn" type="button" (click)="rehacer()" [disabled]="!h.puedeRehacer || ocupado()" title="Rehacer">↷ Rehacer</button>
+    <div class="publicar">
+      <button class="btn primario" type="button" (click)="publicar()" [disabled]="!puedePublicar()">✓ Aprobar y publicar</button>
+      <small [class.listo]="puedePublicar()">{{ motivoNoPublicar() }}</small>
+    </div>
+  </section>
+
+  @if (h.mensaje) {
+    <div class="mensaje" [class.malo]="duros().length > 0">{{ h.mensaje }}</div>
+  }
+
+  <div class="cuerpo">
+    <section class="tarjeta tablero" aria-label="Cuadrícula semanal">
+      <div class="rejilla" [style.grid-template-columns]="'104px repeat(' + (params()?.dias?.length ?? 6) + ', minmax(0, 1fr))'">
+        <div class="esquina"></div>
+        @for (d of params()?.dias ?? []; track d) {
+          <div class="dia">{{ nombresDia[d] }}</div>
+        }
+
+        @for (f of params()?.franjas ?? []; track $index; let fi = $index) {
+          <div class="hora" [class.corta]="fi === params()?.franjaAlmuerzo">{{ f }}</div>
+          @for (d of params()?.dias ?? []; track d) {
+            <div class="celda"
+                 [class.bloqueada]="esBloqueada(d, fi)"
+                 [class.corta]="fi === params()?.franjaAlmuerzo"
+                 [class.sobre]="celdaSobre() === clave(d, fi)"
+                 (dragover)="alPasarSobre($event, d, fi)"
+                 (dragleave)="celdaSobre.set(null)"
+                 (drop)="alSoltar($event, d, fi)">
+              @if (esBloqueada(d, fi) && !celdas().get(clave(d, fi))) {
+                <span class="bloqueo">{{ etiquetaBloqueo(d, fi) }}</span>
+              }
+              @for (s of celdas().get(clave(d, fi)) ?? []; track s.id) {
+                <div class="sesion"
+                     draggable="true"
+                     tabindex="0"
+                     [class.duro]="nivelConflicto(s) === 'duro'"
+                     [class.blando]="nivelConflicto(s) === 'blando'"
+                     [class.elegida]="seleccionadaId() === s.id"
+                     [class.resaltada]="resaltadas().includes(s.id)"
+                     [class.arrastrando]="arrastrandoId() === s.id"
+                     [style.background]="nivelConflicto(s) === 'duro' ? null : fondo(s)"
+                     [style.border-left-color]="nivelConflicto(s) === 'duro' ? null : borde(s)"
+                     (dragstart)="alArrastrar($event, s)"
+                     (dragend)="alTerminarArrastre()"
+                     (click)="seleccionadaId.set(s.id)"
+                     (keydown.enter)="seleccionadaId.set(s.id)"
+                     [attr.aria-label]="s.grupoCodigo + ' ' + s.cursoNombre">
+                  <div class="fila1">
+                    <strong>{{ s.grupoCodigo }}</strong>
+                    @if (nivelConflicto(s) === 'duro') { <span class="icono-duro" title="Conflicto">!</span> }
+                    @else if (nivelConflicto(s) === 'blando') { <span class="icono-blando" title="Advertencia"></span> }
+                    @if (cambiadas().has(s.id)) { <span class="cambio">cambió</span> }
+                  </div>
+                  <div class="curso">{{ s.cursoNombre }}</div>
+                  <div class="meta">{{ nombreCorto(s.docenteNombre) }} · {{ s.aulaCodigo }}</div>
+                </div>
+              }
+            </div>
+          }
+        }
+      </div>
+    </section>
+
+    <aside class="lateral">
+      @if (seleccionada(); as s) {
+        <section class="tarjeta detalle">
+          <header>
+            <div>
+              <div class="sobretitulo">Sesión seleccionada</div>
+              <h3>{{ s.grupoCodigo }} · {{ s.cursoNombre }}</h3>
+            </div>
+            <button class="cerrar" type="button" (click)="seleccionadaId.set(null)" aria-label="Cerrar">×</button>
+          </header>
+          <dl>
+            <dt>Docente</dt><dd>{{ s.docenteNombre }}</dd>
+            <dt>Cuándo</dt><dd>{{ nombresDia[s.dia] }} · {{ params()?.franjas?.[s.franja] }}</dd>
+            <dt>Estudiantes</dt><dd>{{ s.inscritos }} inscritos · aula de {{ s.aulaCapacidad }}</dd>
+          </dl>
+          <label class="campo">
+            <span>Aula</span>
+            <select [value]="s.aulaId" (change)="cambiarAula($any($event.target).value)" [disabled]="ocupado()">
+              @for (a of aulasPara(s); track a.id) {
+                <option [value]="a.id" [selected]="a.id === s.aulaId">{{ a.codigo }} · {{ a.capacidad }} puestos · {{ a.tipo.toLowerCase() }}</option>
+              }
+            </select>
+          </label>
+          @for (c of conflictosDe(s); track $index) {
+            <p class="nota" [class.dura]="c.severidad === 'DURA'">{{ c.mensaje }}</p>
+          }
+        </section>
+      }
+
+      <section class="tarjeta conflictos">
+        <header>
+          <h3>Conflictos</h3>
+          <span class="etiqueta" [class.alerta]="duros().length > 0" [class.ok]="duros().length === 0">{{ duros().length }} duros</span>
+          <span class="etiqueta neutral">{{ blandos().length }} advertencias</span>
+        </header>
+        @if (h.conflictos.length === 0) {
+          <p class="vacio">Sin conflictos. Todas las reglas se cumplen.</p>
+        }
+        <ul>
+          @for (c of duros(); track $index) {
+            <li class="dura" (click)="irAConflicto(c)" (mouseenter)="resaltadas.set(c.sesionIds)" (mouseleave)="resaltadas.set([])">
+              <span class="tipo">{{ c.tipo.replace('_', ' ').toLowerCase() }}</span>
+              {{ c.mensaje }}
+            </li>
+          }
+          @for (c of blandos(); track $index) {
+            <li class="blanda" (click)="irAConflicto(c)" (mouseenter)="resaltadas.set(c.sesionIds)" (mouseleave)="resaltadas.set([])">
+              <span class="tipo">advertencia</span>
+              {{ c.mensaje }}
+            </li>
+          }
+        </ul>
+      </section>
+
+      @if (h.estado === 'PUBLICADO') {
+        <section class="tarjeta siguiente">
+          <p>Horario publicado. Al corte de matrícula, revisa los grupos con pocos inscritos.</p>
+          <a class="btn oscuro" routerLink="/cierre">Ir a cierre de grupos →</a>
+        </section>
+      }
+
+      <section class="leyenda">
+        <span><i class="l-duro"></i> Conflicto duro: impide publicar</span>
+        <span><i class="l-blando"></i> Advertencia: se puede publicar</span>
+        <span><i class="l-cambio"></i> Cambió frente a la versión publicada</span>
+      </section>
+    </aside>
+  </div>
+} @else {
+  <p class="cargando">Cargando horario…</p>
+}
